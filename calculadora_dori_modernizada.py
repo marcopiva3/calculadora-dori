@@ -177,7 +177,9 @@ hr { border-color: var(--line); }
     box-shadow: 0 0 12px var(--cyan);
 }
 .result-card {
+    height: 128px;
     min-height: 128px;
+    box-sizing: border-box;
     padding: 19px 20px;
     border-radius: 16px;
     border: 1px solid var(--line);
@@ -235,6 +237,8 @@ hr { border-color: var(--line); }
     border-radius: 14px;
     border: 1px solid var(--line);
 }
+
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -445,8 +449,7 @@ with c4:
     st.markdown(f"""
     <div class="result-card">
         <div class="result-label">Classificação DORI</div>
-        <div class="result-value" style="font-size:1.65rem">{nivel}</div>
-        <span class="status-pill {classe_css}">{pxm:.0f} px/m</span>
+        <div class="result-value" style="font-size:2rem">{nivel}</div>
     </div>
     """, unsafe_allow_html=True)
 
