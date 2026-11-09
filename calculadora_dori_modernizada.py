@@ -2,6 +2,7 @@ import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
 from PIL import Image, ImageFilter, ImageOps
+from io import BytesIO
 
 # =====================================================
 # CONFIGURAÇÃO
@@ -582,23 +583,43 @@ arquivo = st.file_uploader(
     help="Formatos aceitos: JPG, JPEG e PNG."
 )
 
-if arquivo:
+if arquivo is not None:
     try:
-        img = Image.open(arquivo)
-        img = ImageOps.exif_transpose(img).convert("RGB")
-        simulada = simular_camera(img, pxm)
+        # Lê o arquivo enviado
+        dados_imagem = arquivo.getvalue()
+
+        # Abre a imagem com segurança
+        img = Image.open(BytesIO(dados_imagem))
+        img.load()
+
+        # Corrige orientação e padroniza o formato
+        img = ImageOps.exif_transpose(img)
+        img = img.convert("RGB")
+
+        # Garante que pxm seja um número escalar
+        pxm_simulacao = float(pxm)
+
+        # Gera a simulação
+        simulada = simular_camera(img, pxm_simulacao)
 
         col1, col2 = st.columns(2, gap="large")
+
         with col1:
             with st.container(border=True):
                 st.markdown("#### Imagem original")
                 st.image(img, use_container_width=True)
+
         with col2:
             with st.container(border=True):
-                st.markdown(f"#### Simulação estimada • {pxm:.0f} px/m")
+                st.markdown(
+                    f"#### Simulação estimada • {pxm_simulacao:.0f} px/m"
+                )
                 st.image(simulada, use_container_width=True)
+
     except Exception as erro:
-        st.error(f"Não foi possível abrir a imagem. Verifique o arquivo enviado. Detalhe: {erro}")
+        st.error("Não foi possível processar a imagem.")
+        st.exception(erro)
+
 else:
     st.info("Envie uma imagem para comparar a referência com a simulação estimada.")
 
