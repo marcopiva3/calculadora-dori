@@ -9,7 +9,7 @@ from io import BytesIO
 # =====================================================
 
 st.set_page_config(
-    page_title="Vision Lab | Calculadora DORI",
+    page_title="Vision Lab | Simulação de DORI para CFTV",
     page_icon="📡",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -238,8 +238,6 @@ hr { border-color: var(--line); }
     border-radius: 14px;
     border: 1px solid var(--line);
 }
-
-
 </style>
 """, unsafe_allow_html=True)
 
@@ -328,8 +326,12 @@ def estilizar_grafico(ax):
 # =====================================================
 
 with st.sidebar:
-    st.markdown("## 📡 VISION LAB")
-    st.caption("CALCULADORA DORI")
+    try:
+        logo = Image.open("logo.jpg")
+        st.image(logo, use_container_width=True)
+    except Exception:
+        st.markdown("## 📡 VISION LAB")
+        
     st.divider()
 
     st.markdown("### ⚙️ Parâmetros da câmera")
@@ -370,7 +372,7 @@ with st.sidebar:
         unsafe_allow_html=True
     )
     st.markdown(
-        '<div class="footer">VISION LAB<br>Ferramenta de apoio ao dimensionamento</div>',
+        '<div class="footer">VISIONLAB<br>Simulação de DORI para CFTV</div>',
         unsafe_allow_html=True
     )
 
@@ -402,8 +404,8 @@ classes = {
 
 st.markdown("""
 <div class="hero">
-    <div class="eyebrow">CALCULADORA DORI • CAMERA PLANNER</div>
-    <div class="hero-title">Vision Lab</div>
+    <div class="eyebrow">SIMULAÇÃO DE DORI PARA CFTV</div>
+    <div class="hero-title">VisionLab</div>
     <div class="hero-subtitle">Dimensionamento de campo de visão, densidade de pixels
     e análise de nível de detalhe para projetos de CFTV</div>
 </div>
@@ -421,7 +423,7 @@ c1, c2, c3, c4 = st.columns(4)
 with c1:
     st.markdown(f"""
     <div class="result-card">
-        <div class="result-label">Campo de visão horizontal</div>
+        <div class="result-label">Visão horizontal</div>
         <div class="result-value">{fov:.1f}°</div>
         <div class="result-foot">Ângulo de abertura</div>
     </div>
@@ -557,7 +559,7 @@ with dire:
 # =====================================================
 
 with st.container(border=True):
-    st.markdown("#### 📋 Configuração utilizada")
+    st.markdown("#### ◉ Configuração utilizada")
     r1, r2, r3, r4 = st.columns(4)
     r1.metric("Sensor", sensor)
     r2.metric("Lente", f"{lente:.1f} mm")
@@ -569,59 +571,52 @@ with st.container(border=True):
 # =====================================================
 
 st.markdown('<div class="section-heading"><span class="section-dot"></span> Simulador de imagem</div>',
-            unsafe_allow_html=True)
+                unsafe_allow_html=True)
 
-st.markdown(
-    '<div class="note">Carregue uma imagem de referência para visualizar uma simulação '
-    'ilustrativa do efeito da densidade de pixels calculada.</div>',
-    unsafe_allow_html=True
-)
+with st.container(border=True):
 
-arquivo = st.file_uploader(
-    "Selecione uma imagem de referência",
-    type=["jpg", "jpeg", "png"],
-    help="Formatos aceitos: JPG, JPEG e PNG."
-)
+    st.markdown(
+        '<div class="note" style="margin-bottom: 15px;">Carregue uma imagem de referência para visualizar uma simulação '
+        'ilustrativa do efeito da densidade de pixels calculada.</div>',
+        unsafe_allow_html=True
+    )
 
-if arquivo is not None:
-    try:
-        # Lê o arquivo enviado
-        dados_imagem = arquivo.getvalue()
+    arquivo = st.file_uploader(
+        "Selecione uma imagem de referência",
+        type=["jpg", "jpeg", "png"],
+        help="Formatos aceitos: JPG, JPEG e PNG."
+    )
 
-        # Abre a imagem com segurança
-        img = Image.open(BytesIO(dados_imagem))
-        img.load()
+    if arquivo is not None:
+        try:
+            dados_imagem = arquivo.getvalue()
+            img = Image.open(BytesIO(dados_imagem))
+            img.load()
+            img = ImageOps.exif_transpose(img)
+            img = img.convert("RGB")
+            pxm_simulacao = float(pxm)
+            simulada = simular_camera(img, pxm_simulacao)
 
-        # Corrige orientação e padroniza o formato
-        img = ImageOps.exif_transpose(img)
-        img = img.convert("RGB")
+            col1, col2 = st.columns(2, gap="large")
 
-        # Garante que pxm seja um número escalar
-        pxm_simulacao = float(pxm)
+            with col1:
+                with st.container(border=True):
+                    st.markdown("#### Imagem original")
+                    st.image(img, use_container_width=True)
 
-        # Gera a simulação
-        simulada = simular_camera(img, pxm_simulacao)
+            with col2:
+                with st.container(border=True):
+                    st.markdown(
+                        f"#### Simulação estimada • {pxm_simulacao:.0f} px/m"
+                    )
+                    st.image(simulada, use_container_width=True)
 
-        col1, col2 = st.columns(2, gap="large")
+        except Exception as erro:
+            st.error("Não foi possível processar a imagem.")
+            st.exception(erro)
 
-        with col1:
-            with st.container(border=True):
-                st.markdown("#### Imagem original")
-                st.image(img, use_container_width=True)
-
-        with col2:
-            with st.container(border=True):
-                st.markdown(
-                    f"#### Simulação estimada • {pxm_simulacao:.0f} px/m"
-                )
-                st.image(simulada, use_container_width=True)
-
-    except Exception as erro:
-        st.error("Não foi possível processar a imagem.")
-        st.exception(erro)
-
-else:
-    st.info("Envie uma imagem para comparar a referência com a simulação estimada.")
+    #else:
+    #    st.info("Envie uma imagem para comparar a referência com a simulação estimada.")
 
 # =====================================================
 # RODAPÉ
@@ -629,7 +624,7 @@ else:
 
 st.markdown("""
 <div class="footer">
-    VISION LAB · CALCULADORA DORI<br>
+    VISIONLAB · SIMULAÇÃO DE DORI PARA CFTV<br>
     Desenvolvido por Marco Piva
 </div>
 """, unsafe_allow_html=True)
