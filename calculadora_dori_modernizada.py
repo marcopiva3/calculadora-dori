@@ -3,6 +3,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 from PIL import Image, ImageFilter, ImageOps
 from io import BytesIO
+import tempfile
+import os
+from fpdf import FPDF
 
 # =====================================================
 # CONFIGURAÇÃO
@@ -14,6 +17,10 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
+
+# Inicializa o contador de visitas na sessão
+if 'visitas' not in st.session_state:
+    st.session_state['visitas'] = 1
 
 # =====================================================
 # IDENTIDADE VISUAL
@@ -109,6 +116,8 @@ div[data-baseweb="select"] * { color: #e8f1fb !important; }
     background: rgba(13,27,45,.58);
 }
 hr { border-color: var(--line); }
+
+/* Botões padrão na área principal */
 .stButton > button {
     border: 1px solid rgba(53,213,242,.45);
     border-radius: 10px;
@@ -121,6 +130,44 @@ hr { border-color: var(--line); }
     color: white;
     box-shadow: 0 0 22px rgba(53,213,242,.18);
 }
+
+/* Unificação perfeita da fonte e estilo dos botões na Sidebar */
+[data-testid="stSidebar"] [data-testid="stDownloadButton"] > button,
+.contact-btn, .counter-display {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    padding: 10px 16px;
+    border-radius: 10px;
+    border: 1px solid rgba(53, 213, 242, 0.35);
+    background: #12263c;
+    color: #e8f1fb !important;
+    text-decoration: none !important;
+    font-family: 'DM Sans', sans-serif !important;
+    font-size: 0.9rem !important;
+    font-weight: 600 !important;
+    box-sizing: border-box;
+    transition: all 0.25s ease;
+}
+
+[data-testid="stSidebar"] [data-testid="stDownloadButton"] > button div,
+[data-testid="stSidebar"] [data-testid="stDownloadButton"] > button p {
+    font-family: 'DM Sans', sans-serif !important;
+    font-size: 0.9rem !important;
+    font-weight: 600 !important;
+    color: #e8f1fb !important;
+}
+
+[data-testid="stSidebar"] [data-testid="stDownloadButton"] > button:hover,
+.contact-btn:hover {
+    border-color: var(--cyan);
+    background: rgba(53, 213, 242, 0.12);
+    color: #ffffff !important;
+    box-shadow: 0 0 16px rgba(53, 213, 242, 0.18);
+}
+
 .hero {
     position: relative;
     overflow: hidden;
@@ -321,8 +368,129 @@ def estilizar_grafico(ax):
     ax.grid(True, color="#29445f", alpha=0.55, linestyle="--")
 
 
+def gerar_pdf_simulacao(sensor, lente, res, distancia, fov, largura, pxm, nivel, fig_cov, fig_dori, img_orig=None, img_sim=None):
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_auto_page_break(auto=True, margin=15)
+
+    # Cabeçalho escuro
+    pdf.set_fill_color(13, 27, 45)
+    pdf.rect(0, 0, 210, 34, "F")
+    pdf.set_text_color(53, 213, 242)
+    pdf.set_font("Helvetica", "B", 18)
+    pdf.set_xy(14, 9)
+    pdf.cell(0, 8, "VisionLab | Relatorio de Simulacao DORI", ln=True)
+    pdf.set_text_color(200, 216, 233)
+    pdf.set_font("Helvetica", "", 10)
+    pdf.set_x(14)
+    pdf.cell(0, 6, "Dimensionamento de campo de visao, densidade de pixels e nivel de detalhe para CFTV", ln=True)
+
+    pdf.ln(12)
+
+    # Seção 1: Parâmetros Configurados
+    pdf.set_text_color(13, 27, 45)
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.cell(0, 8, "1. Parametros da Camera e Cenario", ln=True)
+    pdf.set_draw_color(53, 213, 242)
+    pdf.line(14, pdf.get_y(), 196, pdf.get_y())
+    pdf.ln(4)
+
+    pdf.set_font("Helvetica", "", 10)
+    pdf.set_text_color(40, 40, 40)
+    col_w = 45.5
+    headers_param = ["Sensor", "Lente", "Resolucao", "Distancia"]
+    vals_param = [sensor, f"{lente:.1f} mm", res.split(" ")[0], f"{distancia} m"]
+
+    pdf.set_fill_color(238, 245, 252)
+    pdf.set_font("Helvetica", "B", 9)
+    for h in headers_param:
+        pdf.cell(col_w, 7, h, border=1, align="C", fill=True)
+    pdf.ln()
+
+    pdf.set_font("Helvetica", "", 10)
+    for v in vals_param:
+        pdf.cell(col_w, 8, v, border=1, align="C")
+    pdf.ln(10)
+
+    # Seção 2: Resultados da Análise
+    pdf.set_text_color(13, 27, 45)
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.cell(0, 8, "2. Resultados Calculados", ln=True)
+    pdf.line(14, pdf.get_y(), 196, pdf.get_y())
+    pdf.ln(4)
+
+    headers_res = ["Visao Horizontal", "Largura Coberta", "Densidade", "Classificacao DORI"]
+    vals_res = [f"{fov:.1f} graus", f"{largura:.1f} m", f"{pxm:.0f} px/m", nivel.upper()]
+
+    pdf.set_font("Helvetica", "B", 9)
+    for h in headers_res:
+        pdf.cell(col_w, 7, h, border=1, align="C", fill=True)
+    pdf.ln()
+
+    pdf.set_font("Helvetica", "B", 10)
+    for v in vals_res:
+        pdf.cell(col_w, 8, v, border=1, align="C")
+    pdf.ln(10)
+
+    # Seção 3: Análise Visual (Gráficos)
+    pdf.set_text_color(13, 27, 45)
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.cell(0, 8, "3. Analise Visual (Cobertura e Curva DORI)", ln=True)
+    pdf.line(14, pdf.get_y(), 196, pdf.get_y())
+    pdf.ln(4)
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        path_cov = os.path.join(tmpdir, "cov.png")
+        path_dori = os.path.join(tmpdir, "dori.png")
+        fig_cov.savefig(path_cov, dpi=150, bbox_inches="tight", facecolor="#0d1b2d")
+        fig_dori.savefig(path_dori, dpi=150, bbox_inches="tight", facecolor="#0d1b2d")
+
+        y_graphs = pdf.get_y()
+        pdf.image(path_cov, x=14, y=y_graphs, w=88)
+        pdf.image(path_dori, x=108, y=y_graphs, w=88)
+        pdf.set_y(y_graphs + 62)
+
+        # Seção 4: Simulador de Imagem (se houver imagem)
+        if img_orig is not None and img_sim is not None:
+            if pdf.get_y() > 200:
+                pdf.add_page()
+            pdf.set_text_color(13, 27, 45)
+            pdf.set_font("Helvetica", "B", 12)
+            pdf.cell(0, 8, f"4. Simulacao de Imagem ({pxm:.0f} px/m)", ln=True)
+            pdf.line(14, pdf.get_y(), 196, pdf.get_y())
+            pdf.ln(4)
+
+            path_orig = os.path.join(tmpdir, "orig.jpg")
+            path_sim = os.path.join(tmpdir, "sim.jpg")
+            img_orig.save(path_orig, format="JPEG", quality=85)
+            img_sim.save(path_sim, format="JPEG", quality=85)
+
+            w_orig, h_orig = img_orig.size
+            aspect = h_orig / float(w_orig)
+            img_w = 88
+            img_h = min(65, img_w * aspect)
+
+            y_imgs = pdf.get_y()
+            pdf.set_font("Helvetica", "B", 9)
+            pdf.cell(94, 6, "Imagem Original", ln=False)
+            pdf.cell(94, 6, "Simulacao Estimada", ln=True)
+            y_imgs = pdf.get_y()
+
+            pdf.image(path_orig, x=14, y=y_imgs, w=img_w, h=img_h)
+            pdf.image(path_sim, x=108, y=y_imgs, w=img_w, h=img_h)
+            pdf.set_y(y_imgs + img_h + 6)
+
+    # Rodapé
+    pdf.set_y(-20)
+    pdf.set_font("Helvetica", "I", 8)
+    pdf.set_text_color(120, 120, 120)
+    pdf.cell(0, 10, "Gerado automaticamente por VisionLab | Desenvolvido por Marco Piva", align="C")
+
+    return bytes(pdf.output())
+
+
 # =====================================================
-# SIDEBAR
+# SIDEBAR (PARÂMETROS)
 # =====================================================
 
 with st.sidebar:
@@ -369,10 +537,6 @@ with st.sidebar:
     st.markdown(
         '<div class="note">Ajuste os parâmetros para visualizar, em tempo real, '
         'o campo de visão e a classificação DORI estimada.</div>',
-        unsafe_allow_html=True
-    )
-    st.markdown(
-        '<div class="footer">VISIONLAB<br>Simulação de DORI para CFTV</div>',
         unsafe_allow_html=True
     )
 
@@ -498,7 +662,6 @@ with esq:
         estilizar_grafico(ax)
         fig.tight_layout()
         st.pyplot(fig, use_container_width=True)
-        plt.close(fig)
 
 with dire:
     with st.container(border=True):
@@ -514,7 +677,6 @@ with dire:
             label="Densidade calculada"
         )
 
-        # Faixas de referência DORI
         ax2.axhspan(250, max(250, float(np.max(y))), color="#8e44ad",
                     alpha=0.12, label="Identificar")
         ax2.axhspan(125, 250, color="#e74c3c", alpha=0.10, label="Reconhecer")
@@ -552,7 +714,6 @@ with dire:
             txt.set_color("#d9e8f5")
         fig2.tight_layout()
         st.pyplot(fig2, use_container_width=True)
-        plt.close(fig2)
 
 # =====================================================
 # RESUMO TÉCNICO
@@ -572,6 +733,9 @@ with st.container(border=True):
 
 st.markdown('<div class="section-heading"><span class="section-dot"></span> Simulador de imagem</div>',
                 unsafe_allow_html=True)
+
+img_orig_pdf = None
+img_sim_pdf = None
 
 with st.container(border=True):
 
@@ -597,6 +761,9 @@ with st.container(border=True):
             pxm_simulacao = float(pxm)
             simulada = simular_camera(img, pxm_simulacao)
 
+            img_orig_pdf = img
+            img_sim_pdf = simulada
+
             col1, col2 = st.columns(2, gap="large")
 
             with col1:
@@ -615,8 +782,60 @@ with st.container(border=True):
             st.error("Não foi possível processar a imagem.")
             st.exception(erro)
 
-    #else:
-    #    st.info("Envie uma imagem para comparar a referência com a simulação estimada.")
+
+# =====================================================
+# SIDEBAR (RELATÓRIO PDF, CONTATO E VISUALIZAÇÕES)
+# =====================================================
+
+with st.sidebar:
+    st.markdown("---")
+    st.markdown("### 📄 Relatório")
+
+    pdf_bytes = gerar_pdf_simulacao(
+        sensor=sensor,
+        lente=lente,
+        res=res,
+        distancia=distancia,
+        fov=fov,
+        largura=largura,
+        pxm=pxm,
+        nivel=nivel,
+        fig_cov=fig,
+        fig_dori=fig2,
+        img_orig=img_orig_pdf,
+        img_sim=img_sim_pdf
+    )
+
+    st.download_button(
+        label="Gerar PDF",
+        data=pdf_bytes,
+        file_name=f"VisionLab_DORI_{sensor.replace('/', '-')}_{lente}mm_{distancia}m.pdf",
+        mime="application/pdf",
+        use_container_width=True
+    )
+
+    st.markdown("### 💬 Contato")
+    st.markdown(
+        '<a href="https://www.linkedin.com/in/pivamarcoantonio/" target="_blank" class="contact-btn">'
+        '<span>Fale Comigo</span>'
+        '</a>',
+        unsafe_allow_html=True
+    )
+
+    st.markdown("### 👁️ Visualizações")
+    st.markdown(
+        f'<div class="counter-display"><span>{st.session_state["visitas"]}</span></div>',
+        unsafe_allow_html=True
+    )
+
+    st.markdown(
+        '<div class="footer">VISIONLAB<br>Simulação de DORI para CFTV</div>',
+        unsafe_allow_html=True
+    )
+
+# Fecha as figuras após gerar o PDF para liberar memória
+plt.close(fig)
+plt.close(fig2)
 
 # =====================================================
 # RODAPÉ
