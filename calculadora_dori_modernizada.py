@@ -741,7 +741,7 @@ with st.container(border=True):
 
     st.markdown(
         '<div class="note" style="margin-bottom: 15px;">Carregue uma imagem de referência para visualizar uma simulação '
-        'ilustrativa do efeito da densidade de pixels calculada.</div>',
+        'ilustrativa do efeito da densidade de pixels calculada. Para melhores resultados, use uma imagem com a mesma resolução da câmera escolhida.</div>',
         unsafe_allow_html=True
     )
 
