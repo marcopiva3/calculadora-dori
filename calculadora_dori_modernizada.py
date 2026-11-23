@@ -7,27 +7,64 @@ import tempfile
 import os
 from fpdf import FPDF
 import urllib.request
+import urllib.error
 import json
+import base64
 
 
 # =====================================================
-# CONTADOR DE VISITAS
+# CONTADOR DE VISITAS PERSISTENTE VIA GITHUB API
 # =====================================================
 
-def obter_visitas():
-    url = "https://api.counterapi.dev/v1/visionlab/acessos/up"
+def _github_headers(token: str) -> dict:
+    return {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.github+json",
+        "User-Agent": "VisionLab-App",
+        "X-GitHub-Api-Version": "2022-11-28",
+    }
+
+
+def incrementar_visitas_github() -> int:
+    token = st.secrets.get("GITHUB_TOKEN", "")
+    repo = st.secrets.get("GITHUB_REPO", "")
+    file_path = st.secrets.get("GITHUB_FILE_PATH", "visitas.json")
+
+    if not token or not repo:
+        return st.session_state.get("fallback_visitas", 1)
+
+    api_url = f"https://api.github.com/repos/{repo}/contents/{file_path}"
+    headers = _github_headers(token)
+
     try:
-        req = urllib.request.Request(url, headers={"User-Agent": "VisionLab-App"})
-        with urllib.request.urlopen(req, timeout=4) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-            if "count" in data:
-                return int(data["count"])
+        req = urllib.request.Request(api_url, headers=headers, method="GET")
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            payload = json.loads(resp.read().decode("utf-8"))
+
+        sha = payload["sha"]
+        raw_content = base64.b64decode(payload["content"]).decode("utf-8")
+        data = json.loads(raw_content)
+        novo_total = int(data.get("total", 0)) + 1
+
+        novo_json = json.dumps({"total": novo_total}, indent=2) + "\n"
+        encoded_content = base64.b64encode(novo_json.encode("utf-8")).decode("utf-8")
+
+        put_body = json.dumps({
+            "message": f"Atualiza contador de visitas para {novo_total}",
+            "content": encoded_content,
+            "sha": sha,
+        }).encode("utf-8")
+
+        put_headers = {**headers, "Content-Type": "application/json"}
+        put_req = urllib.request.Request(api_url, data=put_body, headers=put_headers, method="PUT")
+        with urllib.request.urlopen(put_req, timeout=5) as put_resp:
+            if put_resp.status in (200, 201):
+                return novo_total
+
     except Exception:
         pass
-    return 1
 
-if "total_visitas" not in st.session_state:
-    st.session_state["total_visitas"] = obter_visitas()
+    return st.session_state.get("fallback_visitas", 1)
 
 
 # =====================================================
@@ -41,9 +78,10 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# Inicializa o contador de visitas na sessão
-if 'visitas' not in st.session_state:
-    st.session_state['visitas'] = 1
+if "visita_contabilizada" not in st.session_state:
+    st.session_state["total_visitas"] = incrementar_visitas_github()
+    st.session_state["visita_contabilizada"] = True
+
 
 # =====================================================
 # IDENTIDADE VISUAL
@@ -522,7 +560,7 @@ with st.sidebar:
         st.image(logo, use_container_width=True)
     except Exception:
         st.markdown("## 📡 VISION LAB")
-        
+
     st.divider()
 
     st.markdown("### ⚙️ Parâmetros da câmera")
