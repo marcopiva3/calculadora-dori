@@ -741,7 +741,7 @@ with st.container(border=True):
 
     st.markdown(
         '<div class="note" style="margin-bottom: 15px;">Carregue uma imagem de referência para visualizar uma simulação '
-        'ilustrativa do efeito da densidade de pixels calculada. Para melhores resultados, use uma imagem com a mesma resolução da câmera escolhida.</div>',
+        'ilustrativa do efeito da densidade de pixels calculada.</div>',
         unsafe_allow_html=True
     )
 
@@ -823,8 +823,19 @@ with st.sidebar:
     )
 
     st.markdown("### 👁️ Visualizações")
+    
     st.markdown(
-        f'<div class="counter-display"><span>{st.session_state["visitas"]}</span></div>',
+        '<div class="counter-display">'
+        '<script async src="https://api.counterapi.dev/v1/visionlab/acessos/up.js"></script>'
+        '<span id="counter">---</span>'
+        '</div>'
+        '<script>'
+        'fetch("https://api.counterapi.dev/v1/visionlab/acessos/up")'
+        '.then(res => res.json())'
+        '.then(data => { document.getElementById("counter").innerText = data.count; })'
+        '.catch(err => { document.getElementById("counter").innerText = "1"; });'
+        'script>'
+        ,
         unsafe_allow_html=True
     )
 
