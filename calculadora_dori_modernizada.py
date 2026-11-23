@@ -6,6 +6,29 @@ from io import BytesIO
 import tempfile
 import os
 from fpdf import FPDF
+import urllib.request
+import json
+
+
+# =====================================================
+# CONTADOR DE VISITAS
+# =====================================================
+
+def obter_visitas():
+    url = "https://api.counterapi.dev/v1/visionlab/acessos/up"
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "VisionLab-App"})
+        with urllib.request.urlopen(req, timeout=4) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            if "count" in data:
+                return int(data["count"])
+    except Exception:
+        pass
+    return 1
+
+if "total_visitas" not in st.session_state:
+    st.session_state["total_visitas"] = obter_visitas()
+
 
 # =====================================================
 # CONFIGURAÇÃO
@@ -823,19 +846,8 @@ with st.sidebar:
     )
 
     st.markdown("### 👁️ Visualizações")
-    
     st.markdown(
-        '<div class="counter-display">'
-        '<script async src="https://api.counterapi.dev/v1/visionlab/acessos/up.js"></script>'
-        '<span id="counter">---</span>'
-        '</div>'
-        '<script>'
-        'fetch("https://api.counterapi.dev/v1/visionlab/acessos/up")'
-        '.then(res => res.json())'
-        '.then(data => { document.getElementById("counter").innerText = data.count; })'
-        '.catch(err => { document.getElementById("counter").innerText = "1"; });'
-        'script>'
-        ,
+        f'<div class="counter-display"><span>{st.session_state["total_visitas"]}</span></div>',
         unsafe_allow_html=True
     )
 
